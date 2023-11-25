@@ -25,7 +25,7 @@
             {{ userStore.cart.length }}
           </div>
         </li>
-        <li v-if="!user.value" @click="signOut()" class="relative flex items-center justify-between p-2.5 border-b px-3 hover:bg-gray-100 cursor-pointer">
+        <li v-if="!user" @click="signOut()" class="relative flex items-center justify-between p-2.5 border-b px-3 hover:bg-gray-100 cursor-pointer">
           <div class="flex items-center text-[20px] font-semibold">
             <Icon name="ph:sign-out-light" size="33"></Icon>
             <span class="pl-4">Sign out</span>
