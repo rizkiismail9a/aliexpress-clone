@@ -45,7 +45,7 @@
 <script setup>
 import { useUserStore } from "~/store/user";
 const userStore = useUserStore();
-// const client = useSupabaseClient()
+const client = useSupabaseClient();
 const user = useSupabaseUser();
 function goTo(url) {
   userStore.isMenuOverlay = false;
