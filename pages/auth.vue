@@ -16,21 +16,26 @@
         <div>Github</div>
       </button>
     </div>
+    {{ user }}
   </div>
 </template>
 
 <script setup>
-// const client = useSupabaseClient()
-// const user = useSupabaseUser()
-// watchEffect(() => {
-//   if (user.value) {
-//     return navigateTo("/");
-//   }
-// });
+const client = useSupabaseClient();
+const user = useSupabaseUser();
+useHead({
+  title: "Sign In | Aliexpress",
+});
+watchEffect(() => {
+  if (user.value) {
+    return navigateTo("/");
+  }
+});
 
 async function login(provider) {
   const { data, error } = await client.auth.signInWithOAuth({
     provider,
   });
+  console.log(data);
 }
 </script>

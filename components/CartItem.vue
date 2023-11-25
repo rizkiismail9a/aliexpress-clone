@@ -50,7 +50,7 @@ function removeFromCart() {
 }
 watch(
   () => {
-    isSelected.value;
+    return isSelected.value;
   },
   (val) => {
     emit("selectedRadio", { id: product.value.id, val });

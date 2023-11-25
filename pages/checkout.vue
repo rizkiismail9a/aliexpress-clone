@@ -5,7 +5,7 @@
         <div class="md:w-[65%]">
           <div class="bg-white rounded-lg p-4">
             <div class="text-xl font-semibold mb-2">Shipping Address</div>
-            <div v-if="false">
+            <div v-if="currentAddress && currentAddress.data">
               <NuxtLink to="/address" class="flex items-center pb-2 text-blue-500 hover:text-red-400">
                 <Icon name="mdi:plus" size="18" class="mr-2" />
                 Update Address
@@ -15,23 +15,23 @@
                 <ul class="text-xs">
                   <li class="flex items-center gap-2">
                     <div>Contact name:</div>
-                    <div class="font-bold">currentAddress.data.name 👈 ini test doang</div>
+                    <div class="font-bold">{{ currentAddress.data.name }}</div>
                   </li>
                   <li class="flex items-center gap-2">
                     <div>Address:</div>
-                    <div class="font-bold">currentAddress.data.address 👈 ini test doang</div>
+                    <div class="font-bold">{{ currentAddress.data.address }}</div>
                   </li>
                   <li class="flex items-center gap-2">
                     <div>Zip code:</div>
-                    <div class="font-bold">ini test doang</div>
+                    <div class="font-bold">{{ currentAddress.data.zipcode }}</div>
                   </li>
                   <li class="flex items-center gap-2">
                     <div>City:</div>
-                    <div class="font-bold">ini test doang</div>
+                    <div class="font-bold">{{ currentAddress.data.city }}</div>
                   </li>
                   <li class="flex items-center gap-2">
                     <div>Country:</div>
-                    <div class="font-bold">ini test doang</div>
+                    <div class="font-bold">{{ currentAddress.data.country }}</div>
                   </li>
                 </ul>
               </div>
@@ -42,7 +42,7 @@
             </NuxtLink>
           </div>
           <div id="Items" class="bg-white rounded-lg p-4 mt-4">
-            <div v-for="product in products">
+            <div v-for="product in userStore.checkout">
               <CheckoutItem :product="product"></CheckoutItem>
             </div>
           </div>
@@ -65,8 +65,10 @@
               </div>
             </div>
             <form @submit.prevent="payment()">
-              <div class="border border-gray-500 p-2 rounded-sm" id="card-element">untuk Card Element</div>
-              <p id="card-error" role="alert" class="text-red-700 text-center font-semibold">Untuk pesan error</p>
+              <!-- di bawah ini untuk card element -->
+              <div class="border border-gray-500 p-2 rounded-sm" id="card-element"></div>
+              <!-- di bawah ini untuk pesan error  -->
+              <p id="card-error" role="alert" class="text-red-700 text-center font-semibold"></p>
               <button class="mt-4 bg-gradient-to-r from-[#fe630c] to-[#ff3200] w-full tetxt-white text-[21px] font-semibold p-1.5 rounded-full" type="submit" :disabled="isProcessing" :class="isProcessing ? 'opacity-70' : 'opacity-100'">
                 <Icon v-if="isProcessing" name="eos-icons:loading" />
                 <div v-else>Place order</div>
@@ -84,48 +86,47 @@
 </template>
 
 <script setup>
+import { loadStripe } from "@stripe/stripe-js";
 import MainLayout from "~/layouts/MainLayout.vue";
 import { useUserStore } from "~/store/user";
+useHead({
+  title: "Cart Checkout | Aliexpress",
+});
 const userStore = useUserStore();
+const user = useSupabaseUser();
 const route = useRoute();
-
+const runtimeConfig = useRuntimeConfig();
 let stripe = null;
 let elements = null;
 let card = null;
 let form = null;
 let total = ref(0);
-let clientSecret = null;
+let clientSecret = ref("");
 let currentAddress = ref(false);
 let isProcessing = ref(false);
-
-onMounted(() => {
-  isProcessing.value = true;
-  userStore.checkout.forEach((item) => (total.value += item.price));
-  isProcessing.value = false;
+onBeforeMount(async () => {
+  if (userStore.checkout.length < 1) {
+    return navigateTo("/cart");
+  }
+  total.value = 0;
+  if (user.value) {
+    currentAddress.value = await useFetch(`/api/prisma/get-user-address/${user.value.id}`);
+    setTimeout(() => (userStore.isLoading = false), 200);
+  }
 });
-const products = [
-  {
-    id: 1,
-    title: "Ini judul1",
-    description: "Ini deskripsi produk 1",
-    imageLink: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2671&q=80",
-    price: 20000000,
-  },
-  {
-    id: 2,
-    title: "Ini judul 2",
-    description: "Ini deskripsi produk 2",
-    imageLink: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2671&q=80",
-    price: 20000000,
-  },
-  {
-    id: 3,
-    title: "Ini judul 3",
-    description: "Ini deskripsi produk 3",
-    imageLink: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2671&q=80",
-    price: 20000000,
-  },
-];
+watchEffect(() => {
+  if (route.fullPath === "/checkout" && !user.value) {
+    return navigateTo("/auth");
+  }
+});
+onMounted(async () => {
+  isProcessing.value = true;
+
+  userStore.checkout.forEach((item) => {
+    total.value += item.price;
+  });
+});
+
 watch(
   () => total.value,
   () => {
@@ -134,8 +135,101 @@ watch(
     }
   }
 );
-async function stripeInit() {}
-async function payment() {}
-async function createOrder(stripeId) {}
-function showError(errorMsg) {}
+
+async function stripeInit() {
+  try {
+    const stripePK = runtimeConfig.public.stripePk;
+    stripe = await loadStripe(`${stripePK}`);
+    const result = await $fetch("/api/stripe/paymentIntent", {
+      method: "POST",
+      body: {
+        amount: total.value,
+      },
+    });
+    console.log(result);
+    clientSecret.value = result.client_secret;
+    elements = stripe.elements({
+      clientSecret: clientSecret.value,
+      loader: "auto",
+    });
+    let style = {
+      base: {
+        fontSize: "18px",
+        fontFamily: "Arial, sans-serif",
+      },
+      invalid: {
+        fontFamily: "Arial, sans-serif",
+        color: "#EE4B2B",
+        iconColor: "#EE4B2B",
+      },
+    };
+    // card = elements.create("payment", {
+    //   // hidePostalCode: true,
+    //   // style: style,
+    //   layout: "auto",
+    // });
+    // Invalid value for confirmCardPayment: payment_method.card was `payment` Element, which cannot be used to create card PaymentMethods.
+    // Missing value for confirmCardPayment: payment_method.card should be an object or element.
+    card = elements.create("payment", {
+      style,
+    }); // type payment, ada banyak, ada card, ada payment, ada cardCVC, dll
+    // lihat https://stripe.com/docs/js/element/other_element
+    card.mount("#card-element");
+
+    card.on("change", function (event) {
+      document.querySelector("button").disabled = event.empty;
+      document.querySelector("#card-error").textContent = event.error ? event.error.message : "";
+    });
+    isProcessing.value = false;
+  } catch (error) {
+    console.log(error);
+    isProcessing.value = false;
+  }
+}
+async function payment() {
+  if (!currentAddress.value.data) {
+    showError("Please add shipping address");
+    return;
+  }
+  isProcessing.value = true;
+  try {
+    // let res = await stripe.confirmCardPayment(clientSecret.value, {
+    //   payment_method: { card: card, billing_details: { name: user.value.identities[0].identity_data.full_name } },
+    // }); //ini untuk payment type card
+    let res = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+    });
+    console.log("ini hasil confrimPayment", res);
+    await createOrder(res.paymentIntent.id);
+    userStore.cart = [];
+    userStore.checkout = [];
+    return navigateTo("/success");
+  } catch (error) {
+    showError(error.message);
+    isProcessing.value = false;
+  }
+}
+async function createOrder(stripeId) {
+  await useFetch("/api/prisma/create-order", {
+    method: "POST",
+    body: {
+      userId: user.value.id,
+      stripeId,
+      name: currentAddress.value.data.name,
+      address: currentAddress.value.data.address,
+      zipcode: currentAddress.value.data.zipcode,
+      city: currentAddress.value.data.city,
+      country: currentAddress.value.data.country,
+      products: userStore.checkout,
+    },
+  });
+}
+function showError(errorMsg) {
+  let errorHTMLElement = document.getElementById("card-error");
+  errorHTMLElement.textContent = errorMsg;
+  // setTimeout(() => {
+  //   errorHTMLElement.textContent = "";
+  // }, 9000);
+}
 </script>

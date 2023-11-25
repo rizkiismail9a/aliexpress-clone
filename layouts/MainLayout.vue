@@ -32,17 +32,17 @@
           <Icon name="mdi:chevron-down" size="15" class="ml-5" />
 
           <div v-if="isAccountMenu" class="absolute bg-white w-[220px] text-[#333] z-40 top-[38px] -left-[105px] border-x border-b">
-            <div v-if="true">
-              <div class="text-semibold text-[12px] my-4 px-3 text-center">Welcome to KokoShop</div>
+            <div v-if="!user">
+              <div class="text-semibold text-[12px] my-4 px-3 text-center">Welcome to AliExpress</div>
               <div class="flex items-center gap-1 px-3 mb-3">
                 <NuxtLink to="/auth" class="bg-[#ff4646] text-center w-full text-[16px] rounded-sm text-white font-semibold p-2 hover:bg-[#783838]"> Login / Register </NuxtLink>
               </div>
               <div class="border-b"></div>
-              <ul class="bg-white">
-                <li @click="navigateTo('/orders')" class="text-[13px] py-2 px-4 w-full hover:bg-gray-200">My Orders</li>
-                <li v-if="true" class="text-[13px] py-2 px-4 w-full hover:bg-gray-200">Sign Out</li>
-              </ul>
             </div>
+            <ul class="bg-white" v-if="user">
+              <li @click="navigateTo('/orders')" class="text-[13px] py-2 px-4 w-full hover:bg-gray-200">My Orders</li>
+              <li @click="client.auth.signOut()" class="text-[13px] py-2 px-4 w-full hover:bg-gray-200">Sign Out</li>
+            </ul>
           </div>
         </li>
       </ul>
@@ -58,7 +58,7 @@
           <div class="relative">
             <!-- search form -->
             <div class="flex items-center rounded-md w-full border-2 border-[#ff4646]">
-              <input type="text" class="w-full placeholder-gray-400 text-sm pl-3 focus:outline-none h-[30px] rounded-md" v-model="searchKeyword" placeholder="Search Item" />
+              <input type="text" class="w-full placeholder-gray-400 text-sm pl-3 focus:outline-none h-[30px] rounded-md" v-model="searchKeyword" placeholder="Search Item" @keyup="searchByName" />
               <!-- loading animation -->
               <Icon v-if="isSearching" name="eos-icons:loading" size="25" class="mr-2"></Icon>
               <button class="flex items-center bg-[#ff4646] h-full p-1.5 px-2">
@@ -66,20 +66,18 @@
               </button>
             </div>
             <!-- dropdown live search -->
-            <div v-if="false" class="absolute bg-white max-w-[700px] h-auto w-full p-2">
-              <NuxtLink to="item/1">
-                <div class="flex item-centers justify-between">
-                  <div class="flex-1 flex items-center">
-                    <img
-                      src="https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2564&q=80"
-                      alt="foto barang"
-                      class="w-[30px] h-[30px] object-cover rounded-sm"
-                    />
-                    <div class="truncate ml-2">Nama barang</div>
+            <div class="absolute bg-white h-auto w-full">
+              <div v-if="items && items.data" v-for="item in items.data" class="p-1">
+                <NuxtLink :to="`/item/${item.id}`">
+                  <div class="flex item-centers justify-between">
+                    <div class="flex-1 flex items-center">
+                      <img :src="item.imageLink" alt="foto barang" class="w-[30px] h-[30px] object-cover rounded-sm" />
+                      <div class="truncate ml-2">{{ item.name }}</div>
+                    </div>
+                    <div class="truncate font-bold">{{ new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(item.price) }}</div>
                   </div>
-                  <div class="truncate font-bold">Rp23000</div>
-                </div>
-              </NuxtLink>
+                </NuxtLink>
+              </div>
             </div>
           </div>
         </div>
@@ -87,7 +85,7 @@
         <NuxtLink to="/cart" class="flex items-center" @mouseenter="isCartHovered = true" @mouseleave="isCartHovered = false">
           <button class="relative md:block hidden">
             <Icon name="fluent:cart-24-regular" size="33" :color="isCartHovered ? '#ff6464' : ''"></Icon>
-            <span class="absolute bg-[#ff4646] text-white px-1 text-xs rounded -right-[4px]">0</span>
+            <span class="absolute bg-[#ff4646] text-white px-1 text-xs rounded -right-[4px]">{{ userStore.cart.length }}</span>
           </button>
         </NuxtLink>
         <!-- hamburger menu button -->
@@ -108,9 +106,27 @@ import Footer from "~/components/Footer.vue";
 import Loading from "../components/Loading.vue";
 import { useUserStore } from "../store/user";
 const userStore = useUserStore();
+const user = useSupabaseUser();
+const client = useSupabaseClient();
 let isAccountMenu = ref(false);
 let isAccountMenu2 = ref(false);
 let searchKeyword = ref("");
 let isSearching = ref(false);
 let isCartHovered = ref(false);
+let items = ref("");
+
+async function searchByName() {
+  try {
+    if (searchKeyword.value) {
+      isSearching.value = true;
+      items.value = await useFetch(`/api/prisma/search-by-name/${searchKeyword.value}`);
+      isSearching.value = false;
+    } else {
+      isSearching.value = false;
+      items.value = "";
+    }
+  } catch (error) {
+    console.log(error);
+  }
+}
 </script>

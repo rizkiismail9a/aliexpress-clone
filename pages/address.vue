@@ -23,23 +23,37 @@
 <script setup>
 import MainLayout from "~/layouts/MainLayout.vue";
 import { useUserStore } from "~/store/user";
+useHead({
+  title: "Add New Address | Aliexpress",
+});
 const userStore = useUserStore();
-
+const user = useSupabaseUser();
 let contactName = ref(null);
 let address = ref(null);
 let zipCode = ref(null);
 let city = ref(null);
 let country = ref(null);
 let currentAddress = ref(null);
+let isUpdate = ref(false);
 let isWorking = ref(null);
 let error = ref(null);
 
-watchEffect(() => {
+watchEffect(async () => {
+  currentAddress.value = await useFetch(`/api/prisma/get-user-address/${user.value.id}`);
+  if (currentAddress.value.data) {
+    contactName.value = currentAddress.value.data.name;
+    address.value = currentAddress.value.data.address;
+    zipCode.value = currentAddress.value.data.zipCode;
+    city.value = currentAddress.value.data.city;
+    country.value = currentAddress.value.data.country;
+    isUpdate.value = true;
+  }
   userStore.isLoading = false;
 });
 async function submit() {
   isWorking.value = true;
   error.value = null;
+  // cek, apakah seluruh inputan sudah diisi
   if (!contactName.value) {
     error.value = {
       type: "contactName",
@@ -71,5 +85,35 @@ async function submit() {
     isWorking.value = false;
     return;
   }
+  if (isUpdate.value) {
+    await useFetch(`/api/prisma/update-address/${currentAddress.value.data.id}`, {
+      method: "PATCH",
+      body: {
+        userId: user.value.id,
+        name: contactName.value,
+        zipcode: zipCode.value,
+        city: city.value,
+        country: country.value,
+      },
+    });
+    isWorking.value = false;
+    return navigateTo("/checkout");
+  }
+  // kalau isUpdate itu false
+  // console.log("jalan");
+  console.log(user.value.id, contactName.value, address.value, zipCode.value, city.value, country.value);
+  await useFetch(`/api/prisma/add-address`, {
+    method: "POST",
+    body: {
+      userId: user.value.id,
+      address: address.value,
+      name: contactName.value,
+      zipcode: zipCode.value,
+      city: city.value,
+      country: country.value,
+    },
+  });
+  isWorking.value = false;
+  return navigateTo("/checkout");
 }
 </script>
